@@ -1,0 +1,197 @@
+.shell {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 28px 28px 56px;
+}
+
+.top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+  padding: 0 6px;
+}
+
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.logo {
+  font-family: var(--font-en), serif;
+  font-style: italic;
+  font-weight: 500;
+  font-size: 32px;
+  line-height: 1;
+}
+
+.tag {
+  font-family: var(--font-en), serif;
+  font-size: 12px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.back {
+  font-size: 13.5px;
+  color: var(--ink-soft);
+}
+
+.back:hover {
+  color: var(--ink);
+}
+
+.sheet {
+  --day: #c9bfb2;
+  background: var(--paper) var(--noise);
+  border-radius: 4px;
+  padding: 44px 52px 56px;
+  box-shadow:
+    0 1px 0 var(--paper-edge),
+    0 2px 0 #e6ddcf,
+    0 18px 40px -18px rgba(70, 55, 40, 0.35);
+  min-height: 60vh;
+}
+
+.empty {
+  margin-top: 60px;
+  text-align: center;
+  line-height: 1.9;
+  color: var(--ink-soft);
+}
+
+.strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 18px 0 36px;
+}
+
+.dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 48% 52% 55% 45% / 52% 45% 55% 48%;
+  opacity: 0.9;
+  transition: transform 0.2s;
+}
+
+.dot:hover {
+  transform: scale(1.25);
+}
+
+.month + .month {
+  margin-top: 44px;
+}
+
+.monthLabel {
+  font-family: var(--font-en), serif;
+  font-size: 22px;
+  font-style: italic;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 28px 22px;
+}
+
+.card {
+  display: block;
+}
+
+.thumb {
+  position: relative;
+  aspect-ratio: 900 / 1280;
+  background: #fffdf9;
+  border-radius: 2px;
+  box-shadow: 0 1px 3px rgba(70, 55, 40, 0.12);
+  overflow: hidden;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.card:hover .thumb {
+  transform: translateY(-3px) rotate(-0.4deg);
+  box-shadow: 0 10px 22px -10px rgba(70, 55, 40, 0.35);
+}
+
+.thumb img {
+  position: absolute;
+  inset: 8%;
+  width: 84%;
+  height: 84%;
+  object-fit: contain;
+}
+
+.cardMeta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 12px;
+  font-family: var(--font-en), serif;
+}
+
+.cardDate {
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.cardDate small {
+  font-family: var(--font-ko), serif;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.cardNo {
+  font-style: italic;
+  font-size: 15px;
+  color: var(--ink-soft);
+}
+
+.cardMood {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.cardMood i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.cardClosing {
+  margin-top: 6px;
+  font-family: var(--font-hand), var(--font-ko), cursive;
+  font-size: 21px;
+  line-height: 1.2;
+}
+
+@media (max-width: 900px) {
+  .shell {
+    padding: 18px 16px 40px;
+  }
+
+  .top {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0;
+  }
+
+  .sheet {
+    padding: 28px 20px 40px;
+  }
+
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 22px 14px;
+  }
+}

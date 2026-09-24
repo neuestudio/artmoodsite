@@ -1,0 +1,47 @@
+.wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 900 / 1280;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.layer,
+.lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.stroke {
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+
+.lines {
+  pointer-events: none;
+  /* 선이 종이에 스민 듯 살짝 풀어진 먹색 */
+  opacity: 0.92;
+}
+
+.wrap[data-tool="fill"] {
+  cursor: crosshair;
+}
+
+@media (pointer: fine) {
+  .wrap[data-tool="brush"],
+  .wrap[data-tool="eraser"] {
+    cursor: none;
+  }
+}
+
+.cursor {
+  position: absolute;
+  border: 1.5px solid;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}

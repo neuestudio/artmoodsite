@@ -1,0 +1,89 @@
+.row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.bar {
+  position: relative;
+  flex: 1;
+  height: 26px;
+}
+
+.track {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: var(--ink-soft);
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+  filter: url(#rough);
+}
+
+.fillClip {
+  position: absolute;
+  inset: 5px 4px 5px 4px;
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  background:
+    radial-gradient(ellipse at 30% 40%, color-mix(in srgb, var(--day) 55%, white) 0 30%, transparent 70%),
+    linear-gradient(90deg, color-mix(in srgb, var(--day) 70%, white), var(--day));
+  opacity: 0.85;
+  filter: url(#wc-edge);
+  transition:
+    width 0.25s ease,
+    background 0.6s ease;
+}
+
+.ticks {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: -9px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.ticks span {
+  width: 1px;
+  height: 5px;
+  background: var(--ink-faint);
+}
+
+.range {
+  position: absolute;
+  inset: -6px 0;
+  width: 100%;
+  opacity: 0;
+  cursor: ew-resize;
+}
+
+.range:focus-visible + * {
+  outline: none;
+}
+
+.bar:has(.range:focus-visible) .track {
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+
+.value {
+  min-width: 72px;
+  text-align: right;
+  font-family: var(--font-en), serif;
+  font-size: 34px;
+  font-weight: 500;
+  line-height: 1;
+  font-variant-numeric: lining-nums;
+}
+
+.value small {
+  font-size: 16px;
+  margin-left: 2px;
+  color: var(--ink-soft);
+}

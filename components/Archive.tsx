@@ -99,6 +99,13 @@ export default function Archive() {
                       <i style={{ background: c?.hex ?? NEUTRAL_INK }} />
                       {c?.ko ?? "색 없음"} · 만족도 {it.entry.satisfaction}%
                     </p>
+                    {!!it.entry.ratios?.length && (
+                      <div className={styles.cardMix} aria-hidden>
+                        {it.entry.ratios.map((r) => (
+                          <span key={r.id} style={{ flexGrow: r.ratio, background: colorById(r.id)?.hex }} />
+                        ))}
+                      </div>
+                    )}
                     {it.entry.closing && <p className={styles.cardClosing}>{it.entry.closing}</p>}
                   </Link>
                 );

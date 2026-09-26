@@ -255,7 +255,12 @@
   color: var(--ink-soft);
 }
 
-.textBtn:hover {
+.textBtn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.textBtn:hover:not(:disabled) {
   color: var(--ink);
   text-decoration: underline;
   text-underline-offset: 4px;
@@ -318,17 +323,66 @@
   font-variant-numeric: lining-nums;
 }
 
-.dayColor {
-  margin-top: 16px;
+.mix {
+  margin-top: 20px;
+}
+
+.mixCaption,
+.mixEmpty {
   font-size: 12px;
   color: var(--ink-faint);
 }
 
-.dayColor b {
-  font-weight: 400;
+.mixEmpty {
+  margin-top: 16px;
+}
+
+.mixBar {
+  display: flex;
+  gap: 2px;
+  height: 8px;
+  margin-top: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  filter: url(#rough);
+}
+
+.mixBar span {
+  min-width: 3px;
+  opacity: 0.85;
+  transition: flex-grow 0.4s ease;
+}
+
+.mixLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 10px;
+  list-style: none;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+.mixLegend li {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.mixLegend li[data-top] {
   color: var(--ink);
-  padding-bottom: 1px;
-  border-bottom: 2px solid var(--day);
+}
+
+.mixLegend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.mixLegend span {
+  font-family: var(--font-en), serif;
+  font-size: 14px;
+  font-variant-numeric: lining-nums tabular-nums;
 }
 
 .lines {

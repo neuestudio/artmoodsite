@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
-import { ART_H, ART_W, drawingSrc } from "@/lib/drawings";
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
+import { ART_H, ART_W, drawingMaskSrc, drawingSrc } from "@/lib/drawings";
 import { dilate, floodRegion, lineMaskFromImage } from "@/lib/fill";
+import { NONE, computeRatios, decodeLabels, encodeLabels, labelsFromPixels, type MoodRatio } from "@/lib/labels";
 import { PALETTE, hexToRgb } from "@/lib/palette";
 import styles from "./ColoringCanvas.module.css";
 
@@ -10,35 +11,46 @@ export type Tool = "brush" | "fill" | "eraser";
 
 export type ColoringHandle = {
   undo: () => void;
+  redo: () => void;
   clear: () => void;
-  canUndo: () => boolean;
-  exportPaint: () => Promise<Blob | null>;
-  dominantColor: () => string | null;
+};
+
+export type PaintChange = {
+  ratios: MoodRatio[];
+  labels: Uint32Array;
+  // 캔버스가 사라진 뒤에도 저장할 수 있도록 변경 시점에 바로 이미지로 뽑아둔다
+  paint: Promise<Blob | null>;
 };
 
 type Props = {
   drawingId: number;
-  color: string;
+  colorId: string;
   tool: Tool;
   size: number;
   initialPaint: Blob | null;
-  onChange: () => void;
+  initialLabels: Uint32Array | null;
+  onChange: (change: PaintChange) => void;
+  onHistory?: (canUndo: boolean, canRedo: boolean) => void;
   onNotice?: (msg: string) => void;
   ref?: Ref<ColoringHandle>;
 };
 
+type Snapshot = { image: HTMLCanvasElement; labels: Uint8Array };
+
 // 물감을 한 겹씩 얹는 느낌: 획 하나는 균일하게, 겹칠수록 색이 섞이며 깊어진다
 const GLAZE = 0.78;
 const WALL_RADIUS = 5;
-const MAX_UNDO = 15;
+const MAX_HISTORY = 15;
 
 export default function ColoringCanvas({
   drawingId,
-  color,
+  colorId,
   tool,
   size,
   initialPaint,
+  initialLabels,
   onChange,
+  onHistory,
   onNotice,
   ref,
 }: Props) {
@@ -46,28 +58,38 @@ export default function ColoringCanvas({
   const paintRef = useRef<HTMLCanvasElement>(null);
   const strokeRef = useRef<HTMLCanvasElement>(null);
   const wallRef = useRef<Uint8Array | null>(null);
-  const undoRef = useRef<HTMLCanvasElement[]>([]);
-  const drawing = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
+  const areaRef = useRef<Uint8Array | null>(null);
+  const labelsRef = useRef<Uint8Array>(new Uint8Array(ART_W * ART_H).fill(NONE));
+  const undoRef = useRef<Snapshot[]>([]);
+  const redoRef = useRef<Snapshot[]>([]);
+  const drawing = useRef<{ id: number; x: number; y: number; px: number; py: number } | null>(null);
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
   const [scale, setScale] = useState(1);
 
-  const paintCtx = () => paintRef.current!.getContext("2d", { willReadFrequently: true })!;
-  const strokeCtx = () => strokeRef.current!.getContext("2d")!;
+  const colorIndex = Math.max(0, PALETTE.findIndex((c) => c.id === colorId));
+  const color = PALETTE[colorIndex].hex;
 
-  // 초기 그림 불러오기
+  const paintCtx = () => paintRef.current!.getContext("2d", { willReadFrequently: true })!;
+  const strokeCtx = () => strokeRef.current!.getContext("2d", { willReadFrequently: true })!;
+
+  // 저장된 그림과 색 기록 불러오기
   useEffect(() => {
     let cancelled = false;
     const ctx = paintCtx();
     ctx.clearRect(0, 0, ART_W, ART_H);
+    labelsRef.current.fill(NONE);
     if (initialPaint) {
       createImageBitmap(initialPaint).then((bmp) => {
-        if (!cancelled) ctx.drawImage(bmp, 0, 0, ART_W, ART_H);
+        if (cancelled) return;
+        ctx.drawImage(bmp, 0, 0, ART_W, ART_H);
+        const decoded = initialLabels && decodeLabels(initialLabels, ART_W * ART_H);
+        labelsRef.current = decoded ?? labelsFromPixels(ctx.getImageData(0, 0, ART_W, ART_H).data);
       });
     }
     return () => {
       cancelled = true;
     };
-  }, [initialPaint]);
+  }, [initialPaint, initialLabels]);
 
   // 채우기용 벽(선) 마스크
   useEffect(() => {
@@ -80,7 +102,25 @@ export default function ColoringCanvas({
     };
   }, [drawingId]);
 
-  // 화면 크기 대비 캔버스 배율 (브러시 커서 표시용)
+  // 감정 비율에 넣을 도안 안쪽 영역
+  useEffect(() => {
+    areaRef.current = null;
+    const img = new Image();
+    img.src = drawingMaskSrc(drawingId);
+    img.onload = () => {
+      const c = document.createElement("canvas");
+      c.width = ART_W;
+      c.height = ART_H;
+      const ctx = c.getContext("2d", { willReadFrequently: true })!;
+      ctx.drawImage(img, 0, 0, ART_W, ART_H);
+      const px = ctx.getImageData(0, 0, ART_W, ART_H).data;
+      const area = new Uint8Array(ART_W * ART_H);
+      for (let i = 0; i < area.length; i++) area[i] = px[i * 4] > 127 ? 1 : 0;
+      areaRef.current = area;
+    };
+  }, [drawingId]);
+
+  // 화면 크기 대비 캔버스 배율 (브러시 커서 표시용). 캔버스 해상도는 고정이라 크기가 바뀌어도 그림은 그대로다.
   useEffect(() => {
     const el = wrapRef.current!;
     const ro = new ResizeObserver(() => setScale(el.clientWidth / ART_W));
@@ -88,13 +128,42 @@ export default function ColoringCanvas({
     return () => ro.disconnect();
   }, []);
 
-  const pushUndo = () => {
-    const snap = document.createElement("canvas");
-    snap.width = ART_W;
-    snap.height = ART_H;
-    snap.getContext("2d")!.drawImage(paintRef.current!, 0, 0);
-    undoRef.current.push(snap);
-    if (undoRef.current.length > MAX_UNDO) undoRef.current.shift();
+  const snapshot = (): Snapshot => {
+    const image = document.createElement("canvas");
+    image.width = ART_W;
+    image.height = ART_H;
+    image.getContext("2d")!.drawImage(paintRef.current!, 0, 0);
+    return { image, labels: labelsRef.current.slice() };
+  };
+
+  const restore = (s: Snapshot) => {
+    const ctx = paintCtx();
+    ctx.clearRect(0, 0, ART_W, ART_H);
+    ctx.drawImage(s.image, 0, 0);
+    labelsRef.current = s.labels;
+  };
+
+  const reportHistory = () => onHistory?.(undoRef.current.length > 0, redoRef.current.length > 0);
+
+  // 새 작업을 시작하기 직전의 상태를 기록 (다시 실행 기록은 버린다)
+  const beginAction = () => {
+    undoRef.current.push(snapshot());
+    if (undoRef.current.length > MAX_HISTORY) undoRef.current.shift();
+    redoRef.current = [];
+    reportHistory();
+  };
+
+  const emitChange = () => {
+    const canvas = paintRef.current!;
+    const labels = labelsRef.current;
+    const ratios = computeRatios(labels, areaRef.current);
+    // 바탕에만 칠해서 비율이 비어 있어도 그림 자체는 저장한다
+    const hasPaint = labels.some((v) => v !== NONE);
+    onChange({
+      ratios,
+      labels: encodeLabels(labels),
+      paint: hasPaint ? new Promise((res) => canvas.toBlob(res, "image/png")) : Promise.resolve(null),
+    });
   };
 
   const glaze = (source: CanvasImageSource) => {
@@ -106,6 +175,13 @@ export default function ColoringCanvas({
     ctx.restore();
   };
 
+  // 획이 지나간 자리의 색 기록을 갱신 (지우개면 비움)
+  const stampLabels = (value: number) => {
+    const alpha = strokeCtx().getImageData(0, 0, ART_W, ART_H).data;
+    const labels = labelsRef.current;
+    for (let i = 0; i < labels.length; i++) if (alpha[i * 4 + 3] > 0) labels[i] = value;
+  };
+
   const toArt = (e: { clientX: number; clientY: number }) => {
     const r = wrapRef.current!.getBoundingClientRect();
     return {
@@ -114,14 +190,23 @@ export default function ColoringCanvas({
     };
   };
 
-  const segment = (ctx: CanvasRenderingContext2D, from: { x: number; y: number }, to: { x: number; y: number }) => {
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.lineWidth = size;
-    ctx.beginPath();
-    ctx.moveTo(from.x, from.y);
-    ctx.lineTo(to.x, to.y);
-    ctx.stroke();
+  // 지우개는 그림에서 바로 지우고, 지운 자리는 획 캔버스에도 남겨 색 기록을 비우는 데 쓴다
+  const targets = () => {
+    const s = strokeCtx();
+    if (tool !== "eraser") {
+      s.strokeStyle = color;
+      return [s];
+    }
+    const p = paintCtx();
+    p.save();
+    p.globalCompositeOperation = "destination-out";
+    p.strokeStyle = "#000";
+    s.strokeStyle = "#000";
+    return [p, s];
+  };
+
+  const releaseTargets = () => {
+    if (tool === "eraser") paintCtx().restore();
   };
 
   const doFill = (x: number, y: number) => {
@@ -137,6 +222,8 @@ export default function ColoringCanvas({
     layer.height = ART_H;
     const lctx = layer.getContext("2d")!;
     const img = lctx.createImageData(ART_W, ART_H);
+    beginAction();
+    const labels = labelsRef.current;
     for (let i = 0; i < grown.length; i++) {
       if (!grown[i]) continue;
       const p = i * 4;
@@ -144,39 +231,38 @@ export default function ColoringCanvas({
       img.data[p + 1] = g;
       img.data[p + 2] = b;
       img.data[p + 3] = 255;
+      labels[i] = colorIndex;
     }
     lctx.putImageData(img, 0, 0);
-    pushUndo();
     glaze(layer);
-    onChange();
+    emitChange();
     if (res.area > ART_W * ART_H * 0.4) {
       onNotice?.("선이 열린 곳으로 색이 넓게 번졌어요. 마음에 들지 않으면 되돌리기를 눌러주세요.");
     }
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
-    if (e.button !== 0) return;
+    // 두 번째 손가락이나 오른쪽 버튼은 무시 (진행 중인 획이 끊기지 않도록)
+    if (!e.isPrimary || e.button !== 0 || drawing.current) return;
+    e.preventDefault();
     const p = toArt(e);
     if (tool === "fill") {
       doFill(p.x, p.y);
       return;
     }
     wrapRef.current!.setPointerCapture(e.pointerId);
-    pushUndo();
-    drawing.current = { x: p.x, y: p.y, px: p.x, py: p.y };
-    if (tool === "brush") {
-      const ctx = strokeCtx();
-      ctx.clearRect(0, 0, ART_W, ART_H);
-      ctx.strokeStyle = color;
-      segment(ctx, p, { x: p.x + 0.01, y: p.y });
-    } else {
-      const ctx = paintCtx();
-      ctx.save();
-      ctx.globalCompositeOperation = "destination-out";
-      ctx.strokeStyle = "#000";
-      segment(ctx, p, { x: p.x + 0.01, y: p.y });
-      ctx.restore();
+    beginAction();
+    strokeCtx().clearRect(0, 0, ART_W, ART_H);
+    drawing.current = { id: e.pointerId, x: p.x, y: p.y, px: p.x, py: p.y };
+    for (const ctx of targets()) {
+      ctx.lineCap = "round";
+      ctx.lineWidth = size;
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(p.x + 0.01, p.y);
+      ctx.stroke();
     }
+    releaseTargets();
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
@@ -185,102 +271,69 @@ export default function ColoringCanvas({
       setCursor({ x: e.clientX - r.left, y: e.clientY - r.top });
     }
     const d = drawing.current;
-    if (!d) return;
+    if (!d || e.pointerId !== d.id) return;
     const events = e.nativeEvent.getCoalescedEvents?.() ?? [e.nativeEvent];
-    const erasing = tool === "eraser";
-    const ctx = erasing ? paintCtx() : strokeCtx();
-    ctx.save();
-    if (erasing) ctx.globalCompositeOperation = "destination-out";
-    ctx.strokeStyle = erasing ? "#000" : color;
+    const ctxs = targets();
     for (const ev of events) {
       const p = toArt(ev);
       // 중간점을 이어 부드러운 곡선으로
       const mx = (d.x + p.x) / 2;
       const my = (d.y + p.y) / 2;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.lineWidth = size;
-      ctx.beginPath();
-      ctx.moveTo(d.px, d.py);
-      ctx.quadraticCurveTo(d.x, d.y, mx, my);
-      ctx.stroke();
+      for (const ctx of ctxs) {
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.lineWidth = size;
+        ctx.beginPath();
+        ctx.moveTo(d.px, d.py);
+        ctx.quadraticCurveTo(d.x, d.y, mx, my);
+        ctx.stroke();
+      }
       d.px = mx;
       d.py = my;
       d.x = p.x;
       d.y = p.y;
     }
-    ctx.restore();
+    releaseTargets();
   };
 
-  const endStroke = () => {
-    if (!drawing.current) return;
+  const endStroke = (e: React.PointerEvent) => {
+    const d = drawing.current;
+    if (!d || e.pointerId !== d.id) return;
     drawing.current = null;
-    if (tool === "brush") {
+    if (tool === "eraser") {
+      stampLabels(NONE);
+    } else {
+      stampLabels(colorIndex);
       glaze(strokeRef.current!);
-      strokeCtx().clearRect(0, 0, ART_W, ART_H);
     }
-    onChange();
+    strokeCtx().clearRect(0, 0, ART_W, ART_H);
+    emitChange();
   };
 
-  const dominantColor = useCallback(() => {
-    const data = paintCtx().getImageData(0, 0, ART_W, ART_H).data;
-    const rgbs = PALETTE.map((c) => hexToRgb(c.hex));
-    const counts = new Array(PALETTE.length).fill(0);
-    let total = 0;
-    for (let i = 0; i < data.length; i += 4 * 7) {
-      if (data[i + 3] < 40) continue;
-      total++;
-      let best = 0;
-      let bestD = Infinity;
-      for (let k = 0; k < rgbs.length; k++) {
-        const dr = data[i] - rgbs[k][0];
-        const dg = data[i + 1] - rgbs[k][1];
-        const db = data[i + 2] - rgbs[k][2];
-        const dist = dr * dr + dg * dg + db * db;
-        if (dist < bestD) {
-          bestD = dist;
-          best = k;
-        }
-      }
-      counts[best]++;
-    }
-    if (total < 200) return null;
-    return PALETTE[counts.indexOf(Math.max(...counts))].id;
-  }, []);
-
-  useImperativeHandle(
-    ref,
-    () => ({
-      undo() {
-        const snap = undoRef.current.pop();
-        if (!snap) return;
-        const ctx = paintCtx();
-        ctx.clearRect(0, 0, ART_W, ART_H);
-        ctx.drawImage(snap, 0, 0);
-        onChange();
-      },
-      clear() {
-        pushUndo();
-        paintCtx().clearRect(0, 0, ART_W, ART_H);
-        onChange();
-      },
-      canUndo: () => undoRef.current.length > 0,
-      async exportPaint() {
-        const data = paintCtx().getImageData(0, 0, ART_W, ART_H).data;
-        let any = false;
-        for (let i = 3; i < data.length; i += 4 * 5) {
-          if (data[i] > 0) {
-            any = true;
-            break;
-          }
-        }
-        if (!any) return null;
-        return new Promise<Blob | null>((res) => paintRef.current!.toBlob(res, "image/png"));
-      },
-      dominantColor,
-    }),
-    [onChange, dominantColor],
-  );
+  useImperativeHandle(ref, () => ({
+    undo() {
+      const prev = undoRef.current.pop();
+      if (!prev) return;
+      redoRef.current.push(snapshot());
+      restore(prev);
+      reportHistory();
+      emitChange();
+    },
+    redo() {
+      const next = redoRef.current.pop();
+      if (!next) return;
+      undoRef.current.push(snapshot());
+      restore(next);
+      reportHistory();
+      emitChange();
+    },
+    clear() {
+      beginAction();
+      paintCtx().clearRect(0, 0, ART_W, ART_H);
+      labelsRef.current.fill(NONE);
+      emitChange();
+    },
+  }));
 
   const cursorPx = Math.max(size * scale, 6);
 
@@ -294,6 +347,7 @@ export default function ColoringCanvas({
       onPointerUp={endStroke}
       onPointerCancel={endStroke}
       onPointerLeave={() => setCursor(null)}
+      onContextMenu={(e) => e.preventDefault()}
     >
       <canvas ref={paintRef} width={ART_W} height={ART_H} className={styles.layer} />
       <canvas
@@ -301,7 +355,7 @@ export default function ColoringCanvas({
         width={ART_W}
         height={ART_H}
         className={`${styles.layer} ${styles.stroke}`}
-        style={{ opacity: GLAZE }}
+        style={{ opacity: tool === "eraser" ? 0 : GLAZE }}
       />
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={drawingSrc(drawingId)} alt="오늘의 컬러링 도안" className={styles.lines} draggable={false} />

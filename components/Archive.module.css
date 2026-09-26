@@ -168,6 +168,20 @@
   border-radius: 50%;
 }
 
+.cardMix {
+  display: flex;
+  gap: 1.5px;
+  height: 4px;
+  margin-top: 8px;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.cardMix span {
+  min-width: 2px;
+  opacity: 0.85;
+}
+
 .cardClosing {
   margin-top: 6px;
   font-family: var(--font-hand), var(--font-ko), cursive;

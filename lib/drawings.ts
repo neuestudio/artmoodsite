@@ -16,3 +16,8 @@ export function drawingForDay(key: string) {
 export function drawingSrc(id: number) {
   return (DRAWINGS.find((d) => d.id === id) ?? DRAWINGS[0]).src;
 }
+
+// 도안 안쪽 영역(흰색). 열린 선 사이 틈을 메워 만든 윤곽으로, 바탕에 칠한 색을 감정 비율에서 빼는 데 쓴다.
+export function drawingMaskSrc(id: number) {
+  return `/masks/d${DRAWINGS.some((d) => d.id === id) ? id : DRAWINGS[0].id}.png`;
+}

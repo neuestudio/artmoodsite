@@ -3,16 +3,28 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
-import ColoringCanvas, { type ColoringHandle, type Tool } from "./ColoringCanvas";
+import ColoringCanvas, { type ColoringHandle, type PaintChange, type Tool } from "./ColoringCanvas";
 import Heading from "./Heading";
 import MoodBar from "./MoodBar";
 import { formatKey, isValidKey, shiftKey, todayKey } from "@/lib/date";
 import { drawingForDay } from "@/lib/drawings";
 import { NEUTRAL_INK, PALETTE, colorById } from "@/lib/palette";
-import { emptyEntry, loadEntry, loadPaint, pageNumberFor, saveEntry, type Entry } from "@/lib/store";
+import {
+  emptyEntry,
+  loadEntry,
+  loadLabels,
+  loadPaint,
+  pageNumberFor,
+  saveEntry,
+  type Entry,
+  type PaintData,
+} from "@/lib/store";
 import styles from "./Diary.module.css";
 
-type Loaded = { date: string; entry: Entry; paint: Blob | null; pageNo: number };
+type Loaded = { date: string; entry: Entry; paint: Blob | null; labels: Uint32Array | null; pageNo: number };
+
+// 저장 대기 중인 기록. 어느 날짜의 것인지 entry가 함께 들고 있어서, 날짜가 바뀐 뒤에 저장돼도 섞이지 않는다.
+type PendingSave = { entry: Entry; paint?: { blob: Promise<Blob | null>; labels: Uint32Array } };
 
 const SIZES = [
   { px: 9, label: "가는 붓" },
@@ -49,50 +61,57 @@ export default function Diary({ requested }: { requested: string | null }) {
   const [size, setSize] = useState(SIZES[1].px);
   const [notice, setNotice] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "pending" | "saved">("idle");
+  const [history, setHistory] = useState({ undo: false, redo: false });
 
   const canvasRef = useRef<ColoringHandle>(null);
   const entryRef = useRef<Entry | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const paintDirty = useRef(false);
+  const pending = useRef<PendingSave | null>(null);
 
   const date = today ? (isValidKey(requested) && requested <= today ? requested : today) : null;
+
+  const flush = useCallback(async () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    const job = pending.current;
+    pending.current = null;
+    if (!job) return;
+    let paintData: PaintData | undefined;
+    if (job.paint) paintData = { paint: await job.paint.blob, labels: job.paint.labels };
+    await saveEntry({ ...job.entry, updatedAt: Date.now() }, paintData);
+    if (entryRef.current?.date === job.entry.date && !pending.current) setStatus("saved");
+  }, []);
 
   useEffect(() => {
     if (!date) return;
     let cancelled = false;
     (async () => {
-      const [saved, paint, pageNo] = await Promise.all([loadEntry(date), loadPaint(date), pageNumberFor(date)]);
+      // 뒤로가기 등으로 날짜가 바뀌어도 이전 날짜의 남은 기록부터 저장
+      await flush();
+      const [saved, paint, labels, pageNo] = await Promise.all([
+        loadEntry(date),
+        loadPaint(date),
+        loadLabels(date),
+        pageNumberFor(date),
+      ]);
       if (cancelled) return;
       const e = saved ?? emptyEntry(date, drawingForDay(date));
       entryRef.current = e;
-      paintDirty.current = false;
       setEntry(e);
-      setData({ date, entry: e, paint, pageNo });
+      setData({ date, entry: e, paint, labels, pageNo });
+      setHistory({ undo: false, redo: false });
       setStatus(saved ? "saved" : "idle");
     })();
     return () => {
       cancelled = true;
     };
-  }, [date]);
+  }, [date, flush]);
 
-  const flush = useCallback(async () => {
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = null;
-    const e = entryRef.current;
-    if (!e) return;
-    const next = { ...e, updatedAt: Date.now() };
-    let paint: Blob | null | undefined;
-    if (paintDirty.current && canvasRef.current) {
-      paint = await canvasRef.current.exportPaint();
-      paintDirty.current = false;
-    }
-    await saveEntry(next, paint);
-    setStatus("saved");
-  }, []);
-
-  const scheduleSave = useCallback(
-    (paintChanged: boolean) => {
-      if (paintChanged) paintDirty.current = true;
+  const queue = useCallback(
+    (entry: Entry, paint?: PendingSave["paint"]) => {
+      const prev = pending.current;
+      // 글만 바뀐 경우에도 아직 저장 안 된 그림은 함께 가져간다
+      pending.current = { entry, paint: paint ?? (prev?.entry.date === entry.date ? prev.paint : undefined) };
       setStatus("pending");
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(flush, 700);
@@ -103,7 +122,7 @@ export default function Diary({ requested }: { requested: string | null }) {
   // 창을 닫거나 다른 탭으로 갈 때 남은 기록을 저장
   useEffect(() => {
     const onHide = () => {
-      if (timer.current) flush();
+      if (pending.current) flush();
     };
     window.addEventListener("pagehide", onHide);
     document.addEventListener("visibilitychange", onHide);
@@ -113,20 +132,44 @@ export default function Diary({ requested }: { requested: string | null }) {
     };
   }, [flush]);
 
+  // Cmd/Ctrl+Z 되돌리기, Shift+Cmd/Ctrl+Z 또는 Ctrl+Y 다시 실행 (글을 쓰는 중에는 글자 되돌리기가 우선)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      if (!(e.metaKey || e.ctrlKey)) return;
+      const k = e.key.toLowerCase();
+      if (k === "z") {
+        e.preventDefault();
+        if (e.shiftKey) canvasRef.current?.redo();
+        else canvasRef.current?.undo();
+      } else if (k === "y") {
+        e.preventDefault();
+        canvasRef.current?.redo();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const update = (patch: Partial<Entry>) => {
     const next = { ...entryRef.current!, ...patch };
     entryRef.current = next;
     setEntry(next);
-    scheduleSave(false);
+    queue(next);
   };
 
-  const onPaintChange = useCallback(() => {
-    const dominant = canvasRef.current?.dominantColor() ?? null;
-    const next = { ...entryRef.current!, dominant };
-    entryRef.current = next;
-    setEntry(next);
-    scheduleSave(true);
-  }, [scheduleSave]);
+  const onPaintChange = useCallback(
+    ({ ratios, labels, paint }: PaintChange) => {
+      const next = { ...entryRef.current!, ratios, dominant: ratios[0]?.id ?? null };
+      entryRef.current = next;
+      setEntry(next);
+      queue(next, { blob: paint, labels });
+    },
+    [queue],
+  );
+
+  const onHistory = useCallback((undo: boolean, redo: boolean) => setHistory({ undo, redo }), []);
 
   const showNotice = useCallback((msg: string) => {
     setNotice(msg);
@@ -134,7 +177,7 @@ export default function Diary({ requested }: { requested: string | null }) {
   }, []);
 
   const go = async (href: string) => {
-    if (timer.current) await flush();
+    await flush();
     router.push(href);
   };
 
@@ -142,7 +185,6 @@ export default function Diary({ requested }: { requested: string | null }) {
 
   const ready = data && entry && data.date === date;
   const dayHex = colorById(entry?.dominant)?.hex ?? NEUTRAL_INK;
-  const color = colorById(colorId)!;
   const f = date ? formatKey(date) : null;
 
   return (
@@ -176,11 +218,13 @@ export default function Diary({ requested }: { requested: string | null }) {
                 key={data.date}
                 ref={canvasRef}
                 drawingId={entry.drawing}
-                color={color.hex}
+                colorId={colorId}
                 tool={tool}
                 size={size}
                 initialPaint={data.paint}
+                initialLabels={data.labels}
                 onChange={onPaintChange}
+                onHistory={onHistory}
                 onNotice={showNotice}
               />
             )}
@@ -242,8 +286,21 @@ export default function Diary({ requested }: { requested: string | null }) {
             </div>
 
             <div className={styles.toolGroup}>
-              <button className={styles.textBtn} onClick={() => canvasRef.current?.undo()}>
+              <button
+                className={styles.textBtn}
+                onClick={() => canvasRef.current?.undo()}
+                disabled={!history.undo}
+                title="되돌리기 (⌘Z / Ctrl+Z)"
+              >
                 되돌리기
+              </button>
+              <button
+                className={styles.textBtn}
+                onClick={() => canvasRef.current?.redo()}
+                disabled={!history.redo}
+                title="다시 실행 (⇧⌘Z / Ctrl+Y)"
+              >
+                다시 실행
               </button>
               <button
                 className={styles.textBtn}
@@ -284,15 +341,7 @@ export default function Diary({ requested }: { requested: string | null }) {
               <div className={styles.block}>
                 <Heading en="MOOD" ko="오늘의 만족도" index={2} htmlFor="mood" />
                 <MoodBar id="mood" value={entry.satisfaction} onChange={(v) => update({ satisfaction: v })} />
-                <p className={styles.dayColor}>
-                  {entry.dominant ? (
-                    <>
-                      오늘의 색 <b>{colorById(entry.dominant)!.ko}</b>
-                    </>
-                  ) : (
-                    "색을 칠하면 오늘의 색이 제목에 번져요"
-                  )}
-                </p>
+                <MoodMix ratios={entry.ratios ?? []} />
               </div>
 
               {WRITE_FIELDS.map((fld, i) => (
@@ -334,6 +383,34 @@ export default function Diary({ requested }: { requested: string | null }) {
 }
 
 const noopSubscribe = () => () => {};
+
+// 오늘 칠한 감정 색의 비율: 도안 안쪽에 칠한 면적만을 100%로 본다 (바탕과 빈 종이는 제외)
+function MoodMix({ ratios }: { ratios: { id: string; ratio: number }[] }) {
+  if (!ratios.length) return <p className={styles.mixEmpty}>도안에 색을 칠하면 오늘의 감정 비율이 여기에 번져요</p>;
+  return (
+    <div className={styles.mix}>
+      <p className={styles.mixCaption}>도안에 칠한 감정 비율</p>
+      <div
+        className={styles.mixBar}
+        role="img"
+        aria-label={ratios.map((r) => `${colorById(r.id)!.ko} ${r.ratio}%`).join(", ")}
+      >
+        {ratios.map((r) => (
+          <span key={r.id} style={{ flexGrow: r.ratio, background: colorById(r.id)!.hex }} />
+        ))}
+      </div>
+      <ul className={styles.mixLegend}>
+        {ratios.map((r, i) => (
+          <li key={r.id} data-top={i === 0 ? "" : undefined}>
+            <i style={{ background: colorById(r.id)!.hex }} />
+            {colorById(r.id)!.ko}
+            <span>{r.ratio}%</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 function ToolButton({
   active,

@@ -1,5 +1,7 @@
-import { get, set, del, keys } from "idb-keyval";
+import { del, get, keys, set } from "idb-keyval";
+import type { MoodRatio } from "./labels";
 
+// 하루 기록은 세 조각으로 나눠 IndexedDB에 둔다: 글·수치(entry), 그림(paint PNG), 픽셀별 색 기록(labels)
 export type Entry = {
   date: string;
   drawing: number;
@@ -9,22 +11,27 @@ export type Entry = {
   how: string;
   closing: string;
   dominant: string | null;
+  ratios?: MoodRatio[];
   updatedAt: number;
 };
 
+export type PaintData = { paint: Blob | null; labels: Uint32Array };
+
 const entryKey = (date: string) => `entry:${date}`;
 const paintKey = (date: string) => `paint:${date}`;
+const labelsKey = (date: string) => `labels:${date}`;
 
 export function emptyEntry(date: string, drawing: number): Entry {
   return {
     date,
     drawing,
-    satisfaction: 50,
+    satisfaction: 0,
     what: "",
     why: "",
     how: "",
     closing: "",
     dominant: null,
+    ratios: [],
     updatedAt: 0,
   };
 }
@@ -37,10 +44,21 @@ export async function loadPaint(date: string) {
   return (await get<Blob>(paintKey(date))) ?? null;
 }
 
-export async function saveEntry(entry: Entry, paint?: Blob | null) {
+export async function loadLabels(date: string) {
+  return (await get<Uint32Array>(labelsKey(date))) ?? null;
+}
+
+// paintData를 넘기지 않으면 그림은 그대로 두고 글·수치만 저장
+export async function saveEntry(entry: Entry, paintData?: PaintData) {
   await set(entryKey(entry.date), entry);
-  if (paint === null) await del(paintKey(entry.date));
-  else if (paint) await set(paintKey(entry.date), paint);
+  if (!paintData) return;
+  if (paintData.paint) {
+    await set(paintKey(entry.date), paintData.paint);
+    await set(labelsKey(entry.date), paintData.labels);
+  } else {
+    await del(paintKey(entry.date));
+    await del(labelsKey(entry.date));
+  }
 }
 
 export async function listDates() {

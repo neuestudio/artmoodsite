@@ -1,0 +1,434 @@
+/* ─── 앱 틀: 데스크톱에서는 가운데 한 열 ─── */
+.frame {
+  min-height: 100dvh;
+  background: #e9e2d7 var(--noise);
+}
+
+.outsideLink {
+  position: fixed;
+  top: 24px;
+  left: 28px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  display: none;
+}
+
+.outsideLink:hover {
+  color: var(--ink);
+}
+
+@media (min-width: 760px) {
+  .outsideLink {
+    display: block;
+  }
+}
+
+.column {
+  position: relative;
+  width: min(100%, 480px);
+  min-height: 100dvh;
+  margin: 0 auto;
+  background: var(--bg);
+  box-shadow: 0 0 0 1px rgba(60, 45, 30, 0.04), 0 30px 80px -30px rgba(60, 45, 30, 0.3);
+}
+
+.boot {
+  min-height: 100dvh;
+}
+
+.main[data-tabs] {
+  padding-bottom: calc(96px + env(safe-area-inset-bottom));
+}
+
+/* ─── 하단 탭 ─── */
+.tabbar {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  z-index: 40;
+  width: min(100%, 480px);
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  align-items: center;
+  padding: 6px 8px calc(8px + env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid var(--line);
+}
+
+.tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 0 2px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-faint);
+  transition: color 0.2s;
+}
+
+.tab svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tab[aria-current="page"] {
+  color: var(--ink);
+}
+
+.tab[aria-current="page"] svg {
+  stroke-width: 2.1;
+}
+
+.recordBtn {
+  display: flex;
+  justify-content: center;
+}
+
+.recordBtn span {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  margin-top: -22px;
+  border-radius: 48% 52% 50% 50% / 52% 48% 52% 48%;
+  background: var(--ink);
+  box-shadow: 0 8px 20px -6px rgba(44, 41, 38, 0.55);
+  transition: transform 0.2s;
+}
+
+.recordBtn:active span {
+  transform: scale(0.94);
+}
+
+.recordBtn svg {
+  width: 24px;
+  height: 24px;
+  stroke: #fff;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+
+/* ─── 공용 버튼 ─── */
+.primaryBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 54px;
+  border-radius: 16px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+.primaryBtn:active:not(:disabled) {
+  transform: scale(0.99);
+}
+
+.primaryBtn:disabled {
+  opacity: 0.3;
+}
+
+/* ─── 기록 시트 ─── */
+.choiceList {
+  display: grid;
+  gap: 10px;
+}
+
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 18px 18px;
+  border-radius: 18px;
+  background: var(--bg);
+  text-align: left;
+  transition: background 0.2s;
+}
+
+.choice:hover {
+  background: #eee7dc;
+}
+
+.choiceIcon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.choiceIcon svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.7;
+  stroke-linejoin: round;
+}
+
+.choiceText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.choiceText b {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.choiceText small {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.choiceTime {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+.quickGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px 6px;
+}
+
+.quickItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 0 8px;
+  border-radius: 16px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  transition: background 0.2s;
+}
+
+.quickItem span:first-child {
+  transition: transform 0.2s ease;
+}
+
+.quickItem[aria-checked="true"] {
+  background: var(--bg);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.quickItem[aria-checked="true"] span:first-child {
+  transform: scale(1.12);
+}
+
+.quickLine {
+  margin: 16px 0 12px;
+  text-align: center;
+  font-family: var(--font-ko), serif;
+  font-size: 14px;
+  color: var(--ink-soft);
+  min-height: 1.5em;
+}
+
+.quickNote {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 52px;
+  padding: 0 16px;
+  margin-bottom: 14px;
+  border-radius: 14px;
+  background: var(--bg);
+}
+
+.quickNote input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  font-size: 15px;
+  outline: none;
+}
+
+.quickNote small {
+  font-size: 12px;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── 온보딩 ─── */
+.onboard {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  padding: 28px 24px calc(28px + env(safe-area-inset-bottom));
+  background: var(--paper) var(--noise);
+}
+
+.onboardArt {
+  flex: 1;
+  min-height: 260px;
+  display: grid;
+  place-items: center;
+}
+
+.onboardDrops {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+  max-width: 280px;
+}
+
+.onboardDrops > span {
+  animation: dropIn 0.5s cubic-bezier(0.3, 1.4, 0.5, 1) backwards;
+}
+
+@keyframes dropIn {
+  from {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.6);
+  }
+}
+
+.onboardPaint {
+  position: relative;
+  width: 210px;
+  aspect-ratio: 900 / 1280;
+}
+
+.onboardPaint span {
+  position: absolute;
+  width: 45%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  filter: blur(14px);
+  opacity: 0.75;
+  mix-blend-mode: multiply;
+}
+
+.onboardPaint img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.onboardLock svg {
+  width: 120px;
+  height: 120px;
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+
+.onboardLock rect {
+  fill: #f2c14e;
+  fill-opacity: 0.35;
+}
+
+.onboardBody {
+  padding: 8px 4px 20px;
+}
+
+.onboardEyebrow {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  margin-bottom: 10px;
+}
+
+.onboardTitle {
+  font-family: var(--font-ko), serif;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.38;
+  white-space: pre-line;
+  letter-spacing: -0.02em;
+}
+
+.onboardText {
+  margin-top: 14px;
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--ink-soft);
+  white-space: pre-line;
+}
+
+.nameField {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 26px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.nameField input {
+  height: 52px;
+  padding: 0 16px;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--ink);
+  outline: none;
+}
+
+.nameField input:focus {
+  border-color: var(--ink);
+}
+
+.onboardFoot {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--rule);
+  transition: width 0.25s, background 0.25s;
+}
+
+.dots i[data-on] {
+  width: 20px;
+  background: var(--ink);
+}
+
+.skipBtn {
+  height: 36px;
+  font-size: 14px;
+  color: var(--ink-faint);
+}

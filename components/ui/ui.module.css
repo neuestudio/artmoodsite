@@ -1,0 +1,180 @@
+/* ─── 토스트 ─── */
+.toastWrap {
+  position: fixed;
+  left: 50%;
+  bottom: calc(96px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 60;
+  pointer-events: none;
+  width: min(100% - 32px, 420px);
+  display: flex;
+  justify-content: center;
+}
+
+.toast {
+  padding: 12px 18px;
+  border-radius: 999px;
+  background: rgba(44, 41, 38, 0.92);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: var(--shadow-float);
+  animation: toastIn 0.25s ease;
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* ─── 바텀 시트 ─── */
+.sheetLayer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+}
+
+.scrim {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  background: rgba(35, 28, 22, 0.38);
+  animation: fade 0.2s ease;
+  cursor: default;
+}
+
+.sheet {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: min(100%, 480px);
+  max-height: 88dvh;
+  overflow-y: auto;
+  padding: 10px 22px calc(26px + env(safe-area-inset-bottom));
+  background: var(--surface);
+  border-radius: 26px 26px 0 0;
+  box-shadow: var(--shadow-float);
+  animation: sheetIn 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+  outline: none;
+}
+
+.grabber {
+  display: block;
+  width: 40px;
+  height: 4px;
+  margin: 0 auto 18px;
+  border-radius: 2px;
+  background: var(--line);
+}
+
+.sheetTitle {
+  font-size: 19px;
+  font-weight: 700;
+  margin-bottom: 18px;
+}
+
+@keyframes sheetIn {
+  from {
+    transform: translate(-50%, 40px);
+    opacity: 0;
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ─── 물감 방울 ─── */
+.drop {
+  display: inline-block;
+  flex-shrink: 0;
+  box-shadow: inset 0 -3px 6px rgba(0, 0, 0, 0.1), inset 0 2px 4px rgba(255, 255, 255, 0.35);
+}
+
+.dropEmpty {
+  background: transparent;
+  border: 1.5px dashed var(--rule);
+  box-shadow: none;
+}
+
+/* ─── 감정 비율 ─── */
+.mixBar {
+  display: flex;
+  gap: 2px;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.mixCompact .mixBar {
+  height: 5px;
+}
+
+.mixBar span {
+  min-width: 3px;
+  opacity: 0.88;
+  transition: flex-grow 0.4s ease;
+}
+
+.mixLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 10px;
+  list-style: none;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.mixLegend li {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.mixLegend li[data-top] {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.mixLegend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.mixLegend span {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── 썸네일 ─── */
+.thumb {
+  position: relative;
+  aspect-ratio: 900 / 1280;
+  background: var(--paper);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.thumb img {
+  position: absolute;
+  inset: 8%;
+  width: 84%;
+  height: 84%;
+  object-fit: contain;
+}
+
+.thumbLines {
+  opacity: 0.85;
+}
+
+.thumbDrop {
+  position: absolute;
+  right: 10%;
+  bottom: 8%;
+}

@@ -1,19 +1,30 @@
 :root {
-  --desk: #ece6dc;
+  --bg: #f4efe8;
   --paper: #fbf8f2;
+  --surface: #ffffff;
   --paper-edge: #efe8dc;
   --ink: #2c2926;
   --ink-soft: #6f675e;
   --ink-faint: #a79d91;
+  --line: #ebe4d9;
   --rule: #e3dbcf;
   --day: #b9ae9f;
-  --noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.35 0 0 0 0 0.3 0 0 0 0 0.25 0 0 0 0.09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --radius-lg: 24px;
+  --radius-md: 16px;
+  --shadow-card: 0 1px 2px rgba(60, 45, 30, 0.04), 0 8px 24px -12px rgba(60, 45, 30, 0.14);
+  --shadow-float: 0 12px 40px -12px rgba(60, 45, 30, 0.28);
+  --font-ui: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
+  --noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.35 0 0 0 0 0.3 0 0 0 0 0.25 0 0 0 0.08 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 html,
@@ -23,12 +34,17 @@ body {
 }
 
 body {
-  min-height: 100vh;
-  background: var(--desk) var(--noise);
+  min-height: 100dvh;
+  background: var(--bg);
   color: var(--ink);
-  font-family: var(--font-ko), "Apple SD Gothic Neo", serif;
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  word-break: keep-all;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
 }
 
 a {
@@ -38,9 +54,11 @@ a {
 
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
   color: inherit;
+  letter-spacing: inherit;
 }
 
 button {
@@ -49,11 +67,41 @@ button {
   cursor: pointer;
 }
 
+button:disabled {
+  cursor: default;
+}
+
+img {
+  max-width: 100%;
+}
+
 :focus-visible {
-  outline: 1.5px dashed var(--ink-soft);
+  outline: 2px solid var(--ink);
   outline-offset: 3px;
+  border-radius: 6px;
 }
 
 ::selection {
   background: color-mix(in srgb, var(--day) 40%, transparent);
+}
+
+.serif {
+  font-family: var(--font-ko), serif;
+}
+
+.en {
+  font-family: var(--font-en), serif;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+[hidden] {
+  display: none !important;
 }

@@ -1,7 +1,9 @@
-import { del, get, keys, set } from "idb-keyval";
+import { clear, del, get, keys, set } from "idb-keyval";
 import type { MoodRatio } from "./labels";
 
 // 하루 기록은 세 조각으로 나눠 IndexedDB에 둔다: 글·수치(entry), 그림(paint PNG), 픽셀별 색 기록(labels)
+export type QuickDrop = { color: string; note: string; at: number };
+
 export type Entry = {
   date: string;
   drawing: number;
@@ -12,6 +14,7 @@ export type Entry = {
   closing: string;
   dominant: string | null;
   ratios?: MoodRatio[];
+  quick?: QuickDrop | null;
   updatedAt: number;
 };
 
@@ -32,8 +35,25 @@ export function emptyEntry(date: string, drawing: number): Entry {
     closing: "",
     dominant: null,
     ratios: [],
+    quick: null,
     updatedAt: 0,
   };
+}
+
+// 그날을 대표하는 색: 컬러링이 있으면 그 색, 없으면 한 방울 기록의 색
+export function entryColor(e: Entry | null | undefined) {
+  return e?.dominant ?? e?.quick?.color ?? null;
+}
+
+// 그날의 감정 비율: 컬러링 비율이 우선, 없으면 한 방울 기록을 100%로
+export function entryRatios(e: Entry): MoodRatio[] {
+  if (e.ratios?.length) return e.ratios;
+  if (e.quick) return [{ id: e.quick.color, ratio: 100 }];
+  return [];
+}
+
+export function hasRecord(e: Entry | null | undefined) {
+  return !!e && (!!entryColor(e) || !!(e.what || e.why || e.how || e.closing) || e.satisfaction > 0);
 }
 
 export async function loadEntry(date: string) {
@@ -61,6 +81,11 @@ export async function saveEntry(entry: Entry, paintData?: PaintData) {
   }
 }
 
+export async function saveQuick(date: string, drawing: number, drop: QuickDrop) {
+  const e = (await loadEntry(date)) ?? emptyEntry(date, drawing);
+  await saveEntry({ ...e, quick: drop, updatedAt: Date.now() });
+}
+
 export async function listDates() {
   const all = await keys();
   return all
@@ -69,11 +94,10 @@ export async function listDates() {
     .sort();
 }
 
-export async function loadAll() {
+export async function listEntries() {
   const dates = await listDates();
-  return Promise.all(
-    dates.map(async (d) => ({ entry: (await loadEntry(d))!, paint: await loadPaint(d) })),
-  );
+  const entries = await Promise.all(dates.map((d) => loadEntry(d)));
+  return entries.filter((e): e is Entry => !!e && hasRecord(e));
 }
 
 // 페이지 번호: 기록이 있는 날짜 순서 (아직 기록 전인 날은 그 자리에 들어갈 번호)
@@ -81,4 +105,13 @@ export async function pageNumberFor(date: string) {
   const dates = await listDates();
   const before = dates.filter((d) => d < date).length;
   return before + 1;
+}
+
+export async function exportAll() {
+  const entries = await listEntries();
+  return { app: "artmood", version: 1, exportedAt: new Date().toISOString(), entries };
+}
+
+export async function wipeAll() {
+  await clear();
 }

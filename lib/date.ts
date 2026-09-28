@@ -41,3 +41,32 @@ export function dayNumber(key: string) {
   const d = fromKey(key);
   return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000);
 }
+
+export const WEEK_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
+
+// 해당 날짜가 속한 주(일~토)의 날짜 키
+export function weekKeys(key: string) {
+  const d = fromKey(key);
+  const start = new Date(d);
+  start.setDate(d.getDate() - d.getDay());
+  return Array.from({ length: 7 }, (_, i) => {
+    const x = new Date(start);
+    x.setDate(start.getDate() + i);
+    return toKey(x);
+  });
+}
+
+// 달력 칸: 앞쪽 빈칸은 null
+export function monthCells(year: number, month: number) {
+  const first = new Date(year, month, 1);
+  const days = new Date(year, month + 1, 0).getDate();
+  const cells: (string | null)[] = Array(first.getDay()).fill(null);
+  for (let d = 1; d <= days; d++) cells.push(toKey(new Date(year, month, d)));
+  while (cells.length % 7) cells.push(null);
+  return cells;
+}
+
+export function formatShort(key: string) {
+  const d = fromKey(key);
+  return `${d.getMonth() + 1}월 ${d.getDate()}일`;
+}

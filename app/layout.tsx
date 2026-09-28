@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Gowun_Batang, Nanum_Pen_Script } from "next/font/google";
+import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 import "./globals.css";
 
 const serifKo = Gowun_Batang({
@@ -24,12 +25,24 @@ const hand = Nanum_Pen_Script({
 });
 
 export const metadata: Metadata = {
-  title: "artmood · 무드 컬러 다이어리",
-  description: "여덟 가지 무드 컬러로 오늘의 감정을 색칠하고 기록하는 다이어리",
+  title: {
+    default: "artmood · 색으로 기록하는 감정 다이어리",
+    template: "%s · artmood",
+  },
+  description: "여덟 가지 무드 컬러로 오늘의 감정을 색칠하고, 한 방울로 기록하고, 한 달의 마음을 돌아보는 감정 다이어리",
+  openGraph: {
+    title: "artmood · 색으로 기록하는 감정 다이어리",
+    description: "오늘 하루는 어떤 색이었나요? 30초면 충분한 감정 기록",
+    locale: "ko_KR",
+    type: "website",
+  },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#ECE6DC",
+  themeColor: "#F4EFE8",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
